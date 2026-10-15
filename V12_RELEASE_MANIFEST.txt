@@ -1,0 +1,7 @@
+Incentify Website V12.0.0
+Official repo: Amoghchowdary/incentify-website
+Official Apps Script endpoint: AKfycbwrRfBn52M2yTiwz3yurnmaSgRWb407Ccw-eqUaMMC17i7c8Ezdo2tO5KTTXf_LK00LrQ
+Public lead schema: 4
+Portal schema: 12
+Roles: customer, partner, admin
+Release gates: verify:v12 -> typecheck -> build -> real OTP smoke test

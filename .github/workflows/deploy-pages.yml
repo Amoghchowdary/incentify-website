@@ -1,0 +1,95 @@
+name: Deploy Incentify Website
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: incentify-pages-production
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Verify and Build Website
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Configure GitHub Pages
+        id: pages
+        uses: actions/configure-pages@v6
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -f package-lock.json ]; then
+            npm ci --no-audit --no-fund
+          else
+            npm install --no-audit --no-fund
+          fi
+
+      - name: Run deployment verification
+        run: npm run verify:deployment --if-present
+
+      - name: Verify V12 portal and production configuration
+        run: npm run verify:v12 --if-present
+
+      - name: Run SEO verification
+        run: npm run verify:seo --if-present
+
+      - name: Run TypeScript type-check
+        run: npm run typecheck --if-present
+
+      - name: Build production website
+        env:
+          # Incentify currently deploys on a custom domain, so root '/' is correct.
+          # If this ever changes, create the repository variable VITE_PUBLIC_BASE_PATH.
+          VITE_PUBLIC_BASE_PATH: ${{ vars.VITE_PUBLIC_BASE_PATH || '/' }}
+        run: npm run build
+
+      - name: Verify Pages artifact exists
+        shell: bash
+        env:
+          PAGES_ARTIFACT_PATH: ${{ vars.PAGES_ARTIFACT_PATH || 'dist/client' }}
+        run: |
+          set -euo pipefail
+          echo "Artifact path: ${PAGES_ARTIFACT_PATH}"
+          test -d "${PAGES_ARTIFACT_PATH}"
+          test -f "${PAGES_ARTIFACT_PATH}/index.html"
+          echo "Production artifact verified."
+
+      - name: Upload GitHub Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: ${{ vars.PAGES_ARTIFACT_PATH || 'dist/client' }}
+
+  deploy:
+    name: Deploy to GitHub Pages
+    runs-on: ubuntu-latest
+    needs: build
+    timeout-minutes: 15
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
